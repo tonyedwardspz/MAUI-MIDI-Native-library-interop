@@ -9,6 +9,7 @@ namespace NewBindingMaciOS
 		PortCreateFailed = 1,
 		DestinationNotFound = 2,
 		SendFailed = 3,
-		InvalidMessage = 4
+		InvalidMessage = 4,
+		InputPortCreateFailed = 5
 	}
 }

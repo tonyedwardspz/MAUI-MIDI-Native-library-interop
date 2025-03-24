@@ -4,7 +4,9 @@ import CoreMIDI
 @objc public class MIDILightController: NSObject {
     private var client: MIDIClientRef = 0
     private var outPort: MIDIPortRef = 0
+    private var inPort: MIDIPortRef = 0
     private var destination: MIDIEndpointRef = 0
+    private var midiReceiveCallback: ((UInt8, UInt8, UInt8) -> Void)?
     
     @objc public enum MIDIError: Int, Error {
         case clientCreateFailed
@@ -12,6 +14,7 @@ import CoreMIDI
         case destinationNotFound
         case sendFailed
         case invalidMessage
+        case inputPortCreateFailed
     }
     
     @objc public override init() {
@@ -30,6 +33,71 @@ import CoreMIDI
         if portStatus != noErr {
             throw MIDIError.portCreateFailed
         }
+        
+        // Create input port with read callback
+        let readCallback: MIDIReadProc = { pktList, readProcRefCon, srcConnRefCon in
+            let controller = unsafeBitCast(readProcRefCon, to: MIDILightController.self)
+            controller.handleMIDIInput(pktList.pointee)
+        }
+        
+        let inputPortStatus = MIDIInputPortCreate(client, "Input Port" as CFString, readCallback, Unmanaged.passUnretained(self).toOpaque(), &inPort)
+        if inputPortStatus != noErr {
+            throw MIDIError.inputPortCreateFailed
+        }
+    }
+    
+    private func handleMIDIInput(_ packetList: MIDIPacketList) {
+        var packet = packetList.packet
+        for _ in 0..<packetList.numPackets {
+            let data = withUnsafePointer(to: packet.data) { ptr in
+                Array(UnsafeBufferPointer(start: ptr.withMemoryRebound(to: UInt8.self, capacity: Int(packet.length)) { $0 }, count: Int(packet.length)))
+            }
+            
+            // Process MIDI message if it has at least 3 bytes (status + data1 + data2)
+            if data.count >= 3 {
+                let status = data[0]
+                let data1 = data[1]
+                let data2 = data[2]
+                midiReceiveCallback?(status, data1, data2)
+            }
+            
+            packet = MIDIPacketNext(&packet).pointee
+        }
+    }
+    
+    @objc public func setMIDIReceiveCallback(_ callback: @escaping (UInt8, UInt8, UInt8) -> Void) {
+        midiReceiveCallback = callback
+    }
+    
+    @objc public func connectSource(at sourceIndex: Int) throws {
+        let sourceCount = MIDIGetNumberOfSources()
+        guard sourceIndex < sourceCount else {
+            throw MIDIError.destinationNotFound
+        }
+        
+        let source = MIDIGetSource(sourceIndex)
+        let connectStatus = MIDIPortConnectSource(inPort, source, nil)
+        if connectStatus != noErr {
+            throw MIDIError.portCreateFailed
+        }
+    }
+    
+    @objc public func getAvailableSources(containing filterText: String = "") -> [String] {
+        var sources = [String]()
+        let sourceCount = MIDIGetNumberOfSources()
+        
+        for i in 0..<sourceCount {
+            let endpoint = MIDIGetSource(i)
+            var name: Unmanaged<CFString>?
+            
+            MIDIObjectGetStringProperty(endpoint, kMIDIPropertyName, &name)
+            if let nameUnmanaged = name {
+                let sourceName = nameUnmanaged.takeRetainedValue() as String
+                sources.append("\(i): \(sourceName)")
+            }
+        }
+        
+        return sources
     }
     
     @objc public func connect(to destinationIndex: Int) throws {
@@ -102,6 +170,9 @@ import CoreMIDI
     }
     
     deinit {
+        if inPort != 0 {
+            MIDIPortDispose(inPort)
+        }
         MIDIClientDispose(client)
     }
 }
