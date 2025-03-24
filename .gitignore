@@ -413,3 +413,6 @@ build/Firebase.zip
 build/FirebaseSdk/
 
 .gradle/
+
+xcuserdata/*/*.xcuserdatad/xcschemes/
+macios/native/NewBinding/NewBinding.xcodeproj/project.xcworkspace/xcuserdata/*.xcuserdatad/UserInterfaceState.xcuserstate
