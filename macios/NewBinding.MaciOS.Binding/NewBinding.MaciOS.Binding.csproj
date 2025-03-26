@@ -30,7 +30,7 @@
   </ItemGroup>
 
   <PropertyGroup>
-  <_CodesignDisableTimestamp>true</_CodesignDisableTimestamp>
-</PropertyGroup>
+    <_CodesignDisableTimestamp>true</_CodesignDisableTimestamp>
+  </PropertyGroup>
 
 </Project>

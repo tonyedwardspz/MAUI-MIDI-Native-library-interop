@@ -166,7 +166,8 @@ import CoreMIDI
     }
     
     @objc public func turnLightOff(channel: UInt8 = 0, lightNumber: UInt8 = 0) throws {
-        try turnLightOn(channel: channel, lightNumber: lightNumber, brightness: 0)
+        let noteOffCommand: UInt8 = 0x90 + channel
+        try sendRawMIDIMessage([noteOffCommand, lightNumber, 0])
     }
     
     deinit {
